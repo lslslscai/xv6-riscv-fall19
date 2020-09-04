@@ -112,6 +112,11 @@ exec(char *path, char **argv)
   p->tf->epc = elf.entry;  // initial program counter = main
   p->tf->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
+  //DONE:修改部分----------------------------------------------------------------------
+  printf("page table %p\n",p->pagetable);
+  vmprint(p->pagetable);
+  //---------------------------------------------------------------------------------
+  
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:

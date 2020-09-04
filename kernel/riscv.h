@@ -351,5 +351,12 @@ sfence_vma()
 // that have the high bit set.
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
 
+//通过宏完成页表层数的抓取
+//DONE:修改部分----------------------------------------------------------------------
+#define ADJ_PTE(p) ((p) & 0xFFFFFFFF)
+#define DEPTH(p) ((p >> 32) & (0x3L))
+#define ADJ_LEVEL(p , level) ((p) | (level << 32))
+//---------------------------------------------------------------------
+
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t; // 512 PTEs

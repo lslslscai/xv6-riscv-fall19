@@ -42,13 +42,30 @@ uint64
 sys_sbrk(void)
 {
   int addr;
+  int newaddr;
   int n;
-
+  uint sz;
+  struct proc *p = myproc();
+  
+  printf("!!!!\n");
+  sz = p->sz;
   if(argint(0, &n) < 0)
     return -1;
+  
   addr = myproc()->sz;
-  if(growproc(n) < 0)
-    return -1;
+  p->sz = sz + n;
+  printf("n : %d , p->sz : %d , sz : %d\n\n" , n , p->sz, sz);
+  //if(growproc(n) < 0)
+  //  return -1;
+   newaddr = PGROUNDUP(addr + n);
+  // kill the shit in kernel
+  if(newaddr < PGSIZE || newaddr >= MAXVA)
+    exit(-1);
+  // instantly free mem
+  if(newaddr < addr){
+    uvmdealloc(p->pagetable, addr, newaddr);
+  }
+  p->sz = newaddr;
   return addr;
 }
 

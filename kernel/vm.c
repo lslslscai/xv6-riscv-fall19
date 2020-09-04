@@ -451,3 +451,31 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+void vmprint(pagetable_t pagetable){
+    //获取当前层数，将层数暂存在pagetable的第四十位到第四十四位中
+	uint64 temp = (uint64)pagetable;
+	uint64 depth = DEPTH(temp);
+	//取出层数后，将其恢复至标准格式（在这之后pagetable才能用）
+	temp = ADJ_PTE(temp);
+	pagetable = (pagetable_t)temp;
+	//遍历页表
+    for(int i = 0; i < 512; i++){
+      pte_t pte = pagetable[i];
+      //(pte & (PTE_R|PTE_W|PTE_X) == 0
+      if(pte & PTE_V){
+      	//如果此处有存储东西而且有效
+      	for(int j = 0 ; j <= depth ; j++){
+      		printf(".. ");//根据层数输出点符号
+      	}
+        uint64 child = PTE2PA(pte);
+        printf("%d:pte %p pa %p\n",i,pte,child);
+          if((pte & (PTE_R|PTE_W|PTE_X)) == 0){
+            //如果此处的PTE仍存在下级页表，则递归遍历下级页表
+			depth += 1;
+        	vmprint((pagetable_t)ADJ_LEVEL(child , depth));
+        	depth -= 1;
+        }
+      }
+    }
+}
