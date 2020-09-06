@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -108,10 +110,27 @@ walkaddr(pagetable_t pagetable, uint64 va)
     return 0;
 
   pte = walk(pagetable, va, 0);
-  if(pte == 0)
-    return 0;
-  if((*pte & PTE_V) == 0)
-    return 0;
+  if(pte == 0 || (*pte & PTE_V) == 0){
+    if (va >= myproc()->sz)
+      return 0;
+ 
+    if (va < myproc()->tf->sp)
+      return 0;
+ 
+    uint64 a = PGROUNDDOWN(va);
+    char *mem = kalloc();
+    if (mem == 0)
+    {
+      return 0;
+    }
+    memset(mem, 0, PGSIZE);
+    if (mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R | PTE_U) != 0)
+    {
+      kfree(mem);
+      return 0;
+    }
+    pte = walk(pagetable, va, 0);
+  }
   if((*pte & PTE_U) == 0)
     return 0;
   pa = PTE2PA(*pte);
@@ -188,10 +207,13 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
   last = PGROUNDDOWN(va + size - 1);
   for(;;){
     if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
+    
+    //  panic("uvmunmap: walk");
+      goto nextpage;
     if((*pte & PTE_V) == 0){
-      printf("va=%p pte=%p\n", a, *pte);
-      panic("uvmunmap: not mapped");
+    //  printf("va=%p pte=%p\n", a, *pte);
+    //  panic("uvmunmap: not mapped");
+      goto nextpage;
     }
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
@@ -200,6 +222,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
       kfree((void*)pa);
     }
     *pte = 0;
+  nextpage:
     if(a == last)
       break;
     a += PGSIZE;
@@ -326,9 +349,11 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
-      panic("uvmcopy: pte should exist");
+      //panic("uvmcopy: pte should exist");
+      continue;
     if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+      //panic("uvmcopy: page not present");
+      continue;
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
@@ -452,13 +477,9 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-void vmprint(pagetable_t pagetable){
-    //获取当前层数，将层数暂存在pagetable的第四十位到第四十四位中
-	uint64 temp = (uint64)pagetable;
-	uint64 depth = DEPTH(temp);
-	//取出层数后，将其恢复至标准格式（在这之后pagetable才能用）
-	temp = ADJ_PTE(temp);
-	pagetable = (pagetable_t)temp;
+void vmprint(pagetable_t pagetable , int depth){
+    if(depth == 0)
+    	printf("page table %p\n",pagetable);
 	//遍历页表
     for(int i = 0; i < 512; i++){
       pte_t pte = pagetable[i];
@@ -466,16 +487,17 @@ void vmprint(pagetable_t pagetable){
       if(pte & PTE_V){
       	//如果此处有存储东西而且有效
       	for(int j = 0 ; j <= depth ; j++){
-      		printf(".. ");//根据层数输出点符号
+      		printf(" ..");//根据层数输出点符号
       	}
         uint64 child = PTE2PA(pte);
         printf("%d:pte %p pa %p\n",i,pte,child);
           if((pte & (PTE_R|PTE_W|PTE_X)) == 0){
             //如果此处的PTE仍存在下级页表，则递归遍历下级页表
 			depth += 1;
-        	vmprint((pagetable_t)ADJ_LEVEL(child , depth));
+        	vmprint((pagetable_t)child , depth);
         	depth -= 1;
         }
       }
     }
 }
+

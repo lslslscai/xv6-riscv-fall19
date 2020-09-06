@@ -113,8 +113,7 @@ exec(char *path, char **argv)
   p->tf->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
   //DONE:修改部分----------------------------------------------------------------------
-  printf("page table %p\n",p->pagetable);
-  vmprint(p->pagetable);
+  if(p->pid == 1)vmprint(p->pagetable , 0);
   //---------------------------------------------------------------------------------
   
   return argc; // this ends up in a0, the first argument to main(argc, argv)

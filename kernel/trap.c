@@ -69,29 +69,28 @@ usertrap(void)
     // ok
   } else if(r_scause() == 13 || r_scause() == 15){
       uint64 va = (uint64)r_stval();  
-      uint newsz = p->sz;
       char *mem;
-      uint64 a;
-      
-      va = PGROUNDDOWN(va);    
-      printf("vaddr : %p , p->sz : %p\n" , va , p->sz);
-      for(a = va ; a < newsz ; a += PGSIZE){
+      uint64 base = PGROUNDDOWN(va);
+      //printf("p->tf->sp: %p , p->tf->kernel_sp: %p\n" , p->tf->sp , p->tf->kernel_sp);
+      if(va >= p->sz)
+        p->killed = 1;
+      else if(va < p->tf->sp)
+        p->killed = 1;
+      else{
+       // printf("vaddr : %p , p->sz : %p\n" , va , p->sz);
         mem = kalloc();
-
         if(mem == 0){
-          uvmdealloc(p->pagetable, a, va);
-
           p->killed = 1;
         }
-        memset(mem, 0, PGSIZE);
-
-        if(mappages(p->pagetable, a, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
-          kfree(mem);
-          uvmdealloc(p->pagetable, a, va);
-
-          p->killed = 1;
+        else{
+          memset(mem, 0, PGSIZE);
+          if(mappages(p->pagetable, base, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+            kfree(mem);
+            p->killed = 1;
+          }
         }
       }
+      
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
