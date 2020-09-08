@@ -73,10 +73,8 @@ void *
 takefree(int id){
   struct run* ru = 0;
   
-  for(int i = id+1 ; i != id ; i++){
-    if(i == NCPU-1)
-      i = 0;
-    if(!holding(&kmemlist[i].lock))
+  for(int i = 0 ; i < NCPU ; i++){
+    if(holding(&kmemlist[i].lock))
       continue;
    
     acquire(&kmemlist[i].lock);
@@ -108,8 +106,10 @@ kalloc(void)
   if(r)
     kmemlist[id].freelist = r->next;
   release(&kmemlist[id].lock);
-  if(!r)
+  if(!r){
     r = takefree(id);
+  }
+    
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
